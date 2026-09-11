@@ -1,6 +1,6 @@
 # repL - Privacy-Preserving Student Records
 
-A hackathon prototype for the LETTI/IDSOL pitch competition that demonstrates privacy-preserving student record management using off-chain encryption, on-chain cryptographic commitments, and zero-knowledge proofs.
+A prototype that demonstrates privacy-preserving student record management using off-chain encryption, on-chain cryptographic commitments, and zero-knowledge proofs.
 
 ## Architecture Overview
 - **Off-chain encrypted storage**: Student records are encrypted with AES-256-GCM and stored in a SQLite database
