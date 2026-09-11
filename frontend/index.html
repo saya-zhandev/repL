@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>repL - Privacy-Preserving Student Records</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .panel { border: 1px solid #ccc; padding: 20px; margin: 20px 0; border-radius: 8px; }
+        .registrar { background: #f0f8ff; }
+        .ai-agent { background: #f5fff0; }
+        .attacker { background: #fff0f0; }
+        pre { background: #f4f4f4; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        button { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        input { padding: 8px; margin: 5px; min-width: 150px; }
+    </style>
+</head>
+<body>
+    <h1>repL - Privacy-Preserving Student Records on Midnight/Cardano</h1>
+    
+    <div class="panel registrar">
+        <h2>1. Registrar - Add Student Record</h2>
+        <form id="addStudentForm">
+            <input type="text" id="name" placeholder="Name" required>
+            <input type="text" id="student_id" placeholder="Student ID" required>
+            <input type="number" step="0.1" id="gpa" placeholder="GPA" min="0" max="4" required>
+            <input type="text" id="enrollment_status" placeholder="Enrollment Status" required>
+            <input type="text" id="ssn" placeholder="Mock SSN" required>
+            <button type="submit">Add Student</button>
+        </form>
+        <h3>Result:</h3>
+        <pre id="registrarResult"></pre>
+    </div>
+
+    <div class="panel ai-agent">
+        <h2>2. AI Agent Simulator - Verify Scholarship Eligibility</h2>
+        <p>Asks: "Is this student's GPA >= 3.5 (scholarship threshold)?" Only receives true/false - never sees raw GPA!</p>
+        <input type="text" id="verifyStudentId" placeholder="Student ID">
+        <button id="verifyButton">Check Eligibility</button>
+        <h3>Result:</h3>
+        <pre id="aiResult"></pre>
+    </div>
+
+    <div class="panel attacker">
+        <h2>3. Attacker Simulator - Breach Attempt</h2>
+        <p>Simulates a database breach - what can the attacker steal?</p>
+        <button id="breachButton">Launch Breach Attack!</button>
+        <button id="viewLedgerButton">View On-Chain Ledger</button>
+        <h3>Attacker's View:</h3>
+        <pre id="attackerResult"></pre>
+        <h3>On-Chain Ledger View:</h3>
+        <pre id="ledgerResult"></pre>
+    </div>
+
+    <script>
+        // Registrar form submission
+        document.getElementById('addStudentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                name: document.getElementById('name').value,
+                student_id: document.getElementById('student_id').value,
+                gpa: parseFloat(document.getElementById('gpa').value),
+                enrollment_status: document.getElementById('enrollment_status').value,
+                ssn: document.getElementById('ssn').value
+            };
+            const res = await fetch('/api/students', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            document.getElementById('registrarResult').textContent = JSON.stringify(result, null, 2);
+        });
+
+        // AI agent verification
+        document.getElementById('verifyButton').addEventListener('click', async () => {
+            const studentId = document.getElementById('verifyStudentId').value;
+            const res = await fetch('/api/verify-attribute', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    student_id: studentId,
+                    attribute: "gpa",
+                    threshold: 3.5
+                })
+            });
+            const result = await res.json();
+            document.getElementById('aiResult').textContent = JSON.stringify(result, null, 2);
+        });
+
+        // Attacker breach
+        document.getElementById('breachButton').addEventListener('click', async () => {
+            const res = await fetch('/api/attacker/raw-records');
+            const result = await res.json();
+            document.getElementById('attackerResult').textContent = JSON.stringify(result, null, 2);
+        });
+
+        // View ledger
+        document.getElementById('viewLedgerButton').addEventListener('click', async () => {
+            const res = await fetch('/api/ledger');
+            const result = await res.json();
+            document.getElementById('ledgerResult').textContent = JSON.stringify(result, null, 2);
+        });
+    </script>
+</body>
+</html>
