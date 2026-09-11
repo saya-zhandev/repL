@@ -3,10 +3,12 @@ package main
 import (
 	"log"
 	"net/http"
+	"repl/internal/db"
 	"repl/internal/encryptor"
 	"repl/internal/ledger"
 	"repl/internal/zkcircuit"
-	"repl/internal/db"
+	"strconv"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -48,11 +50,11 @@ func main() {
 		// Registrar: create student record
 		api.POST("/students", func(c *gin.Context) {
 			var req struct {
-				Name           string  `json:"name"`
-				StudentID      string  `json:"student_id"`
-				GPA            float64 `json:"gpa"`
-				EnrollmentStatus string `json:"enrollment_status"`
-				SSN            string  `json:"ssn"`
+				Name             string  `json:"name"`
+				StudentID        string  `json:"student_id"`
+				GPA              float64 `json:"gpa"`
+				EnrollmentStatus string  `json:"enrollment_status"`
+				SSN              string  `json:"ssn"`
 			}
 			if err := c.ShouldBindJSON(&req); err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -61,11 +63,11 @@ func main() {
 
 			// Create plaintext record
 			record := db.StudentRecord{
-				Name:           req.Name,
-				StudentID:      req.StudentID,
-				GPA:            req.GPA,
+				Name:             req.Name,
+				StudentID:        req.StudentID,
+				GPA:              req.GPA,
 				EnrollmentStatus: req.EnrollmentStatus,
-				SSN:            req.SSN,
+				SSN:              req.SSN,
 			}
 
 			// Serialize and encrypt record
@@ -86,9 +88,9 @@ func main() {
 
 			// Store encrypted record in DB
 			dbRecord := db.EncryptedStudent{
-				StudentID:   req.StudentID,
-				Ciphertext:  ciphertext,
-				Commitment:  commitment,
+				StudentID:  req.StudentID,
+				Ciphertext: ciphertext,
+				Commitment: commitment,
 			}
 			if err := database.CreateStudent(&dbRecord); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store record"})
@@ -153,7 +155,7 @@ func main() {
 			}
 
 			// Append verification result to ledger (SIMULATES on-chain proof verification)
-			verificationCommitment := encryptor.ComputeSHA256Commitment([]byte(req.StudentID + ":" + string(verified)))
+			verificationCommitment := encryptor.ComputeSHA256Commitment([]byte(req.StudentID + ":" + strconv.FormatBool(verified)))
 			if err := localLedger.Append(verificationCommitment); err != nil {
 				log.Printf("Failed to append verification to ledger: %v", err)
 			}
@@ -167,8 +169,8 @@ func main() {
 			entries := localLedger.GetEntries()
 			c.JSON(http.StatusOK, gin.H{
 				"ledger_length": len(entries),
-				"entries": entries,
-				"note": "// SIMULATES Midnight/Cardano anchor layer: only cryptographic commitments are stored on-chain, no PII ever"
+				"entries":       entries,
+				"note":          "// SIMULATES Midnight/Cardano anchor layer: only cryptographic commitments are stored on-chain, no PII ever",
 			})
 		})
 
@@ -181,9 +183,9 @@ func main() {
 			}
 			// Return exactly what an attacker would see: ciphertext blobs and hashes
 			c.JSON(http.StatusOK, gin.H{
-				"attacker_view": "You are an attacker who breached the database! Here's what you get:",
+				"attacker_view":     "You are an attacker who breached the database! Here's what you get:",
 				"encrypted_records": allRecords,
-				"note": "All sensitive data is encrypted; you can't read any PII from the ciphertexts!"
+				"note":              "All sensitive data is encrypted; you can't read any PII from the ciphertexts!",
 			})
 		})
 	}
