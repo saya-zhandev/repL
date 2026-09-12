@@ -1,9 +1,9 @@
 package main
 
 import (
-	"repl/internal/encryptor"
-	"repl/internal/ledger"
-	"repl/internal/zkcircuit"
+	"repl/pkg/encryptor"
+	"repl/pkg/ledger"
+	"repl/pkg/zkcircuit"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

@@ -3,10 +3,10 @@ package main
 import (
 	"log"
 	"net/http"
-	"repl/internal/db"
-	"repl/internal/encryptor"
-	"repl/internal/ledger"
-	"repl/internal/zkcircuit"
+	"repl/pkg/db"
+	"repl/pkg/encryptor"
+	"repl/pkg/ledger"
+	"repl/pkg/zkcircuit"
 	"strconv"
 	"sync"
 
