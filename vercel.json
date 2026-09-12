@@ -3,7 +3,7 @@
   "builds": [
     {
       "src": "cmd/server/main.go",
-      "use": "@vercel/go@1.6.0",
+      "use": "@vercel/go",
       "config": {
         "cgo": false
       }
