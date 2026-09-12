@@ -3,9 +3,7 @@ package db
 import (
 	"encoding/json"
 	"errors"
-
-	"github.com/jinzhu/gorm"
-	_ "github.com/mattn/go-sqlite3"
+	"sync"
 )
 
 type StudentRecord struct {
@@ -17,45 +15,54 @@ type StudentRecord struct {
 }
 
 type EncryptedStudent struct {
-	gorm.Model
-	StudentID  string `gorm:"unique_index"`
+	StudentID  string `json:"student_id"`
 	Ciphertext []byte `json:"ciphertext"`
 	Commitment string `json:"commitment"`
 }
 
-type SQLiteDB struct {
-	db *gorm.DB
+// InMemoryDB is a fully Go-native, CGO-free database (works with Vercel serverless)
+type InMemoryDB struct {
+	mu       sync.RWMutex
+	students map[string]EncryptedStudent // key: studentID
 }
 
-func NewSQLiteDB(dbPath string) (*SQLiteDB, error) {
-	db, err := gorm.Open("sqlite3", dbPath)
-	if err != nil {
-		return nil, err
+func NewInMemoryDB() (*InMemoryDB, error) {
+	return &InMemoryDB{
+		students: make(map[string]EncryptedStudent),
+	}, nil
+}
+
+// Close is a no-op for in-memory DB
+func (s *InMemoryDB) Close() error {
+	return nil
+}
+
+func (s *InMemoryDB) CreateStudent(student *EncryptedStudent) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, exists := s.students[student.StudentID]; exists {
+		return errors.New("student already exists")
 	}
-	db.AutoMigrate(&EncryptedStudent{})
-	return &SQLiteDB{db: db}, nil
+	s.students[student.StudentID] = *student
+	return nil
 }
 
-func (s *SQLiteDB) Close() error {
-	return s.db.Close()
-}
-
-func (s *SQLiteDB) CreateStudent(student *EncryptedStudent) error {
-	return s.db.Create(student).Error
-}
-
-func (s *SQLiteDB) GetStudent(studentID string) (*EncryptedStudent, error) {
-	var student EncryptedStudent
-	if err := s.db.Where("student_id = ?", studentID).First(&student).Error; err != nil {
-		return nil, err
+func (s *InMemoryDB) GetStudent(studentID string) (*EncryptedStudent, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	student, exists := s.students[studentID]
+	if !exists {
+		return nil, errors.New("student not found")
 	}
 	return &student, nil
 }
 
-func (s *SQLiteDB) GetAllEncryptedStudents() ([]EncryptedStudent, error) {
+func (s *InMemoryDB) GetAllEncryptedStudents() ([]EncryptedStudent, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	var students []EncryptedStudent
-	if err := s.db.Find(&students).Error; err != nil {
-		return nil, err
+	for _, s := range s.students {
+		students = append(students, s)
 	}
 	return students, nil
 }
@@ -73,4 +80,9 @@ func DeserializeStudentRecord(data []byte) (*StudentRecord, error) {
 		return nil, errors.New("invalid record")
 	}
 	return &sr, nil
+}
+
+// Keep NewSQLiteDB as a wrapper for backward compatibility during transition
+func NewSQLiteDB(dbPath string) (*InMemoryDB, error) {
+	return NewInMemoryDB()
 }
