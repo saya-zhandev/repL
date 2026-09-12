@@ -21,13 +21,13 @@ var (
 
 func initRouter() error {
 	initOnce.Do(func() {
-		// Initialize database
-		database, err := db.NewSQLiteDB("repl.db")
+		// Initialize database - use InMemoryDB for Vercel serverless (100% CGO-free)
+		database, err := db.NewInMemoryDB()
 		if err != nil {
 			initErr = err
 			return
 		}
-		defer database.Close()
+		// InMemoryDB doesn't need to be closed, it's in-memory
 
 		// Initialize AES encryptor (in production, use secure key management)
 		enc, err := encryptor.NewAES256GCM("this-is-a-32-byte-secret-key-123456")
