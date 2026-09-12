@@ -21,13 +21,9 @@ var (
 
 func initRouter() error {
 	initOnce.Do(func() {
-		// Initialize database - use InMemoryDB for Vercel serverless to avoid CGO
-		database, err := db.NewInMemoryDB()
-		if err != nil {
-			initErr = err
-			return
-		}
-		// We don't need to close InMemoryDB, it's in-memory
+		// Initialize database - use InMemoryDB for Vercel serverless (100% CGO-free)
+		database := db.NewInMemoryDB()
+		// InMemoryDB doesn't need to be closed, it's in-memory
 
 		// Initialize AES encryptor (in production, use secure key management)
 		enc, err := encryptor.NewAES256GCM("this-is-a-32-byte-secret-key-123456")
