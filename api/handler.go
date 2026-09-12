@@ -1,4 +1,4 @@
-package main
+package handler
 
 import (
 	"log"
@@ -206,12 +206,11 @@ func initRouter() error {
 	return initErr
 }
 
-func main() {
+// Handler is the exported function required by Vercel's Go serverless runtime
+func Handler(w http.ResponseWriter, r *http.Request) {
 	if err := initRouter(); err != nil {
-		log.Fatalf("Failed to initialize server: %v", err)
+		http.Error(w, "Failed to initialize server: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
-	log.Println("repL server starting on :8080")
-	if err := http.ListenAndServe(":8080", router); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
-	}
+	router.ServeHTTP(w, r)
 }
