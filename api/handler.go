@@ -21,15 +21,14 @@ var (
 
 func initRouter() error {
 	initOnce.Do(func() {
-		// Initialize database - use InMemoryDB for Vercel serverless (100% CGO-free)
+		// Initialize CGO-free in-memory database (Vercel-compatible)
 		database, err := db.NewInMemoryDB()
 		if err != nil {
 			initErr = err
 			return
 		}
-		// InMemoryDB doesn't need to be closed, it's in-memory
 
-		// Initialize AES encryptor (in production, use secure key management)
+		// Initialize AES encryptor (32-byte key for AES-256-GCM)
 		enc, err := encryptor.NewAES256GCM("this-is-a-32-byte-secret-key-123456")
 		if err != nil {
 			initErr = err
@@ -42,7 +41,7 @@ func initRouter() error {
 			log.Printf("No existing ledger found, creating new one: %v", err)
 		}
 
-		// Initialize ZK circuit
+		// Initialize ZK circuit prover
 		zkProver, err := zkcircuit.NewGPAThresholdProver()
 		if err != nil {
 			initErr = err
@@ -58,7 +57,7 @@ func initRouter() error {
 		// API routes
 		api := r.Group("/api")
 		{
-			// Registrar: create student record
+			// Create student record endpoint
 			api.POST("/students", func(c *gin.Context) {
 				var req struct {
 					Name             string  `json:"name"`
@@ -72,7 +71,7 @@ func initRouter() error {
 					return
 				}
 
-				// Create plaintext record
+				// Create and serialize plaintext record
 				record := db.StudentRecord{
 					Name:             req.Name,
 					StudentID:        req.StudentID,
@@ -81,23 +80,23 @@ func initRouter() error {
 					SSN:              req.SSN,
 				}
 
-				// Serialize and encrypt record
 				plaintext, err := record.Serialize()
 				if err != nil {
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to serialize record"})
 					return
 				}
 
+				// Encrypt record
 				ciphertext, err := enc.Encrypt(plaintext)
 				if err != nil {
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "encryption failed"})
 					return
 				}
 
-				// Compute SHA-256 commitment
+				// Compute cryptographic commitment
 				commitment := encryptor.ComputeSHA256Commitment(plaintext)
 
-				// Store encrypted record in DB
+				// Store encrypted record
 				dbRecord := db.EncryptedStudent{
 					StudentID:  req.StudentID,
 					Ciphertext: ciphertext,
@@ -108,14 +107,12 @@ func initRouter() error {
 					return
 				}
 
-				// Append commitment to ledger (SIMULATES Midnight/Cardano anchor layer)
+				// Append to ledger
 				if err := localLedger.Append(commitment); err != nil {
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to append to ledger"})
 					return
 				}
-				if err := localLedger.Save(); err != nil {
-					log.Printf("Failed to save ledger: %v", err)
-				}
+				localLedger.Save()
 
 				c.JSON(http.StatusCreated, gin.H{"status": "record created", "commitment": commitment})
 			})
@@ -132,14 +129,13 @@ func initRouter() error {
 					return
 				}
 
-				// Retrieve encrypted record
+				// Retrieve and decrypt record
 				dbRecord, err := database.GetStudent(req.StudentID)
 				if err != nil {
 					c.JSON(http.StatusNotFound, gin.H{"error": "student not found"})
 					return
 				}
 
-				// Decrypt to get plaintext GPA (only done OFF-CHAIN, never exposed)
 				plaintext, err := enc.Decrypt(dbRecord.Ciphertext)
 				if err != nil {
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "decryption failed"})
@@ -152,54 +148,54 @@ func initRouter() error {
 					return
 				}
 
-				// Only support GPA threshold for MVP (one working real proof)
+				// Only support GPA threshold in MVP
 				if req.Attribute != "gpa" {
-					c.JSON(http.StatusBadRequest, gin.H{"error": "only 'gpa' attribute supported in MVP"})
+					c.JSON(http.StatusBadRequest, gin.H{"error": "only 'gpa' attribute supported"})
 					return
 				}
 
-				// Generate and verify ZK proof that GPA >= threshold
+				// Generate and verify ZK proof
 				verified, err := zkProver.VerifyGPAThreshold(record.GPA, req.Threshold)
 				if err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "ZK proof generation/verification failed"})
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "ZK proof failed"})
 					return
 				}
 
-				// Append verification result to ledger (SIMULATES on-chain proof verification)
+				// Append verification result to ledger
 				verificationCommitment := encryptor.ComputeSHA256Commitment([]byte(req.StudentID + ":" + strconv.FormatBool(verified)))
 				if err := localLedger.Append(verificationCommitment); err != nil {
-					log.Printf("Failed to append verification to ledger: %v", err)
+					log.Printf("Failed to append verification: %v", err)
 				}
 				localLedger.Save()
 
 				c.JSON(http.StatusOK, gin.H{"verified": verified})
 			})
 
-			// Get ledger entries (on-chain data - only hashes!)
+			// Get ledger entries (only hashes, no PII)
 			api.GET("/ledger", func(c *gin.Context) {
 				entries := localLedger.GetEntries()
 				c.JSON(http.StatusOK, gin.H{
 					"ledger_length": len(entries),
 					"entries":       entries,
-					"note":          "// SIMULATES Midnight/Cardano anchor layer: only cryptographic commitments are stored on-chain, no PII ever",
+					"note":          "Only cryptographic commitments stored, no PII exposed!",
 				})
 			})
 
-			// Attacker simulator: get raw encrypted records (demonstrates breach scenario)
+			// Attacker view simulation
 			api.GET("/attacker/raw-records", func(c *gin.Context) {
 				allRecords, err := database.GetAllEncryptedStudents()
 				if err != nil {
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch records"})
 					return
 				}
-				// Return exactly what an attacker would see: ciphertext blobs and hashes
 				c.JSON(http.StatusOK, gin.H{
-					"attacker_view":     "You are an attacker who breached the database! Here's what you get:",
+					"attacker_view":     "You breached the database! This is all you get:",
 					"encrypted_records": allRecords,
-					"note":              "All sensitive data is encrypted; you can't read any PII from the ciphertexts!",
+					"note":              "All sensitive data is encrypted; no PII can be read!",
 				})
 			})
 		} // close api group block
+
 		// Save router to global variable
 		router = r
 	}) // close initOnce.Do()
