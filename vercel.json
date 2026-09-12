@@ -3,7 +3,10 @@
   "builds": [
     {
       "src": "cmd/server/main.go",
-      "use": "@vercel/go@1.6.0"
+      "use": "@vercel/go@1.6.0",
+      "config": {
+        "cgo": false
+      }
     }
   ],
   "routes": [
@@ -11,9 +14,5 @@
       "src": "/(.*)",
       "dest": "cmd/server/main.go"
     }
-  ],
-  "go": {
-    "enabled": true,
-    "cgo": false
-  }
+  ]
 }
