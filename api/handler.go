@@ -28,8 +28,8 @@ func initRouter() error {
 			return
 		}
 
-		// Initialize AES encryptor (32-byte key for AES-256-GCM)
-		enc, err := encryptor.NewAES256GCM("this-is-a-32-byte-secret-key-123456")
+		// Initialize AES encryptor (exact 32-byte key required for AES-256-GCM)
+		enc, err := encryptor.NewAES256GCM("abcdefghijklmnopqrstuvwxyz123456")
 		if err != nil {
 			initErr = err
 			return

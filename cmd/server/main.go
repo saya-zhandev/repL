@@ -21,16 +21,15 @@ var (
 
 func initRouter() error {
 	initOnce.Do(func() {
-		// Initialize database
-		database, err := db.NewSQLiteDB("repl.db")
+		// Initialize CGO-free in-memory database (Vercel-compatible)
+		database, err := db.NewInMemoryDB()
 		if err != nil {
 			initErr = err
 			return
 		}
-		defer database.Close()
 
-		// Initialize AES encryptor (in production, use secure key management)
-		enc, err := encryptor.NewAES256GCM("this-is-a-32-byte-secret-key-123456")
+		// Initialize AES encryptor (exact 32-byte key required for AES-256-GCM)
+		enc, err := encryptor.NewAES256GCM("abcdefghijklmnopqrstuvwxyz123456")
 		if err != nil {
 			initErr = err
 			return
